@@ -62,6 +62,8 @@ Code	Vaccinename	Type
 --------------------------------------------------------------
 *** List users who have been vaccinated for two doses since the given date ***
 UserID	UserName	Address
+7	Tarik Guven	Tepebasi/Eskisehir
+20	Yasemin Surmeli	Surmene/Trabzon
 
 --------------------------------------------------------------
 
@@ -86,6 +88,7 @@ UserID	UserName	Address
 --------------------------------------------------------------
 *** List users who have been vaccinated with at least two different types of vaccines within the given time interval ***
 UserID	UserName	Address
+3	Lale Ege	Merkez/Edirne
 
 --------------------------------------------------------------
 
@@ -98,7 +101,7 @@ EffectCode	EffectName
 --------------------------------------------------------------
 *** Calculate the average number of doses of vaccinated users over the age of 65 ***
 Average
-0.00
+1.80
 
 --------------------------------------------------------------
 
@@ -111,5 +114,6 @@ Average
 --------------------------------------------------------------
 *** Given vaccine name, delete the vaccine(s) from the database ***
 Code	Vaccinename	Type
+81	Convidecia	Adenovirus_vector_vaccines
 
 --------------------------------------------------------------
