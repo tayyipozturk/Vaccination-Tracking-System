@@ -4,6 +4,7 @@ import com.mysql.cj.protocol.Resultset;
 
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 public class CENGVACDB implements ICENGVACDB{
     private static final String url = "jdbc:mysql://144.122.71.121:8080/db2380806?useSSL=false";
@@ -78,7 +79,6 @@ public class CENGVACDB implements ICENGVACDB{
                 e.printStackTrace();
             }
         }
-
         return numberOfTables;
     }
 
@@ -95,7 +95,6 @@ public class CENGVACDB implements ICENGVACDB{
                 e.printStackTrace();
             }
         }
-
         return dropped;
     }
 
@@ -209,10 +208,11 @@ public class CENGVACDB implements ICENGVACDB{
 
     @Override
     public Vaccine[] getVaccinesNotAppliedAnyUser() {
-        String query = "SELECT V.code, V.vaccinename, V.type " +
+        String query = "SELECT DISTINCT V.code, V.vaccinename, V.type " +
                 "FROM Vaccine V " +
                 "WHERE V.code NOT IN (SELECT AV.code " +
-                "FROM Vaccination AV)";
+                "FROM Vaccination AV " +
+                "ORDER BY V.code)";
 
         try {
             PreparedStatement st = this.conn.prepareStatement(query);
@@ -262,11 +262,56 @@ public class CENGVACDB implements ICENGVACDB{
 
     @Override
     public Vaccine[] getTwoRecentVaccinesDoNotContainVac() {
+        String query = "SELECT DISTINCT V.code, V.vaccinename, V.type " +
+                "FROM Vaccine V, Vaccination AV " +
+                "WHERE V.vaccinename NOT LIKE '%vac%' AND V.code = AV.code " +
+                "ORDER BY V.code";
+
+        try {
+            PreparedStatement st = this.conn.prepareStatement(query);
+            ResultSet rs = st.executeQuery();
+            ArrayList<Vaccine> answer = new ArrayList<>();
+            while(rs.next()){
+                answer.add(new Vaccine(
+                        rs.getInt("code"),
+                        rs.getString("vaccinename"),
+                        rs.getString("type")
+                ));
+            }
+            return Arrays.copyOfRange(answer.toArray(new Vaccine[0]), 0, 2);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
         return new Vaccine[0];
     }
 
     @Override
     public QueryResult.UserIDuserNameAddressResult[] getUsersAtHasLeastTwoDoseAtMostOneSideEffect() {
+        String query = "SELECT DISTINCT U.userID, U.username, U.address" +
+                " FROM User U, Vaccination AV " +
+                "WHERE U.userID = AV.userID AND U.userID IN(SELECT U2.userID " +
+                                                        "FROM User U2, Seen S " +
+                                                        "WHERE S.userID = U2.userID " +
+                                                        "GROUP BY U2.userID " +
+                                                        "HAVING COUNT(U.userID) <= 1) " +
+                "GROUP BY U.userID " +
+                "HAVING COUNT(U.userID) >= 2 " +
+                "ORDER BY U.userID";
+        try {
+            PreparedStatement st = this.conn.prepareStatement(query);
+            ResultSet rs = st.executeQuery();
+            ArrayList<QueryResult.UserIDuserNameAddressResult> answer = new ArrayList<>();
+            while (rs.next()){
+                answer.add(new QueryResult.UserIDuserNameAddressResult(
+                        rs.getString("userID"),
+                        rs.getString("username"),
+                        rs.getString("address")));
+            }
+            return answer.toArray(new QueryResult.UserIDuserNameAddressResult[0]);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
         return new QueryResult.UserIDuserNameAddressResult[0];
     }
 
@@ -282,7 +327,8 @@ public class CENGVACDB implements ICENGVACDB{
                 "WHERE V.code = AV.code AND U.userID = AV.userID AND " +
                 "AV.vacdate >= ? AND AV.vacdate <= ? " +
                 "GROUP BY U.userID " +
-                "HAVING COUNT(DISTINCT V.code) >=2";
+                "HAVING COUNT(DISTINCT V.code) >=2 " +
+                "ORDER BY U.userID";
 
         try {
             PreparedStatement st = this.conn.prepareStatement(query);
@@ -306,6 +352,31 @@ public class CENGVACDB implements ICENGVACDB{
 
     @Override
     public AllergicSideEffect[] getSideEffectsOfUserWhoHaveTwoDosesInLessThanTwentyDays() {
+        String query = "SELECT A.effectcode, A.effectname " +
+                "FROM Seen S, AllergicSideEffect A, User U " +
+                "WHERE S.effectcode = A.effectcode AND " +
+                "U.userID = S.userID AND U.userID IN " +
+                "(SELECT DISTINCT U2.userID " +
+                "FROM Seen S2, User U2, Vaccination AV, Vaccination AV2 " +
+                "WHERE S2.userID = U2.userID AND U2.userID = AV.userID AND " +
+                "U2.userID = AV2.userID AND AV.vacdate <> AV2.vacdate AND " +
+                "((DATEDIFF(AV.vacdate, AV2.vacdate) < 20 AND DATEDIFF(AV.vacdate, AV2.vacdate) >=0) OR " +
+                "(DATEDIFF(AV2.vacdate, AV.vacdate) < 20 AND DATEDIFF(AV2.vacdate, AV.vacdate >= 0)))) " +
+                "ORDER BY A.effectcode";
+
+        try {
+            PreparedStatement st = this.conn.prepareStatement(query);
+            ResultSet rs = st.executeQuery();
+            ArrayList<AllergicSideEffect> answer = new ArrayList<>();
+            while (rs.next()){
+                answer.add(new AllergicSideEffect(
+                        rs.getInt("effectcode"),
+                        rs.getString("effectname")));
+            }
+            return answer.toArray(new AllergicSideEffect[0]);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
         return new AllergicSideEffect[0];
     }
 
