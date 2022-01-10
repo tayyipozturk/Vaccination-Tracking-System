@@ -128,7 +128,8 @@ public class CENGVACDB implements ICENGVACDB{
         for(int i=0;i<sideEffects.length;i++){
             try {
                 AllergicSideEffect temp = sideEffects[i];
-                String request = "INSERT IGNORE INTO AllergicSideEffect (effectcode, effectname) VALUES (?, ?);";
+                String request = "INSERT IGNORE INTO AllergicSideEffect (effectcode, effectname) " +
+                        "VALUES (?, ?);";
                 PreparedStatement st = this.conn.prepareStatement(request);
                 st.setInt(1,temp.getEffectCode());
                 st.setString(2,temp.getEffectName());
@@ -147,7 +148,8 @@ public class CENGVACDB implements ICENGVACDB{
         for(int i=0;i<vaccines.length;i++){
             try {
                 Vaccine temp = vaccines[i];
-                String request = "INSERT IGNORE INTO Vaccine (code, vaccineName, type) VALUES (?, ?, ?);";
+                String request = "INSERT IGNORE INTO Vaccine (code, vaccineName, type) " +
+                        "VALUES (?, ?, ?);";
                 PreparedStatement st = this.conn.prepareStatement(request);
                 st.setInt(1,temp.getCode());
                 st.setString(2,temp.getVaccineName());
@@ -167,7 +169,8 @@ public class CENGVACDB implements ICENGVACDB{
         for(int i=0;i<vaccinations.length;i++){
             try {
                 Vaccination temp = vaccinations[i];
-                String request = "INSERT IGNORE INTO Vaccination (code, userID, dose, vacdate) VALUES (?, ?, ?, ?);";
+                String request = "INSERT IGNORE INTO Vaccination (code, userID, dose, vacdate) " +
+                        "VALUES (?, ?, ?, ?);";
                 PreparedStatement st = this.conn.prepareStatement(request);
                 st.setInt(1,temp.getCode());
                 st.setInt(2,temp.getUserID());
@@ -189,7 +192,8 @@ public class CENGVACDB implements ICENGVACDB{
         for(int i=0;i<seens.length;i++){
             try {
                 Seen temp = seens[i];
-                String request = "INSERT IGNORE INTO Seen (effectcode, code, userID, date, degree) VALUES (?, ?, ?, ?, ?);";
+                String request = "INSERT IGNORE INTO Seen (effectcode, code, userID, date, degree) " +
+                        "VALUES (?, ?, ?, ?, ?);";
                 PreparedStatement st = this.conn.prepareStatement(request);
                 st.setInt(1,temp.getEffectcode());
                 st.setInt(2,temp.getCode());
@@ -317,7 +321,35 @@ public class CENGVACDB implements ICENGVACDB{
 
     @Override
     public QueryResult.UserIDuserNameAddressResult[] getVaccinatedUsersWithAllVaccinesCanCauseGivenSideEffect(String effectname) {
+        String query = "SELECT U.userID, U.username, U.address " +
+                "FROM User U " +
+                "WHERE NOT EXISTS (SELECT AV.code " +
+                                "FROM Vaccination AV " +
+                                "WHERE AV.userID = U.userID AND " +
+                                "NOT EXISTS (SELECT S.code " +
+                                            "FROM Seen S, Vaccine V, AllergicSideEffect E " +
+                                            "WHERE S.code = AV.code AND S.userID = U.userID AND " +
+                                            "E.effectname = ?)) " +
+                "GROUP BY U.userID";
+        try {
+            PreparedStatement st = this.conn.prepareStatement(query);
+            st.setString(1, effectname);
+            ResultSet rs = st.executeQuery();
+            ArrayList<QueryResult.UserIDuserNameAddressResult> answer = new ArrayList<>();
+            while (rs.next()){
+                answer.add(new QueryResult.UserIDuserNameAddressResult(
+                        rs.getString("userID"),
+                        rs.getString("username"),
+                        rs.getString("address")));
+            }
+            return answer.toArray(new QueryResult.UserIDuserNameAddressResult[0]);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+
         return new QueryResult.UserIDuserNameAddressResult[0];
+
     }
 
     @Override
@@ -402,7 +434,24 @@ public class CENGVACDB implements ICENGVACDB{
 
     @Override
     public int updateStatusToEligible(String givendate) {
-        return 0;
+        int updated = 0;
+        String request = "UPDATE User U, " +
+                "(SELECT MAX(AV.vacdate) as vacdate, U2.userID FROM User U2, Vaccination AV " +
+                "WHERE U2.userID = AV.userID " +
+                "GROUP BY U2.userID) as Target " +
+                "SET U.status = 'Eligible' " +
+                "WHERE U.userID = Target.userID AND U.status <> 'Eligible' AND " +
+                "DATEDIFF(?, Target.vacdate) > 120";
+        try {
+            PreparedStatement st = this.conn.prepareStatement(request);
+            st.setString(1, givendate);
+            updated = st.executeUpdate();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return updated;
     }
 
     @Override
